@@ -52,6 +52,11 @@
       <li>
         SMS <a href="sms:{{contacts.sms}}">{{contacts.sms}}</a>
       </li>
+      {{#if contacts.pushover}}
+      <li>
+        Pushover <code href="sms:{{contacts.sms}}">{{contacts.pushover}}</code>
+      </li>
+      {{/if}}
       <li>
         <a href="mailto:{{contacts.email}}">{{contacts.email}}</a>
       </li>

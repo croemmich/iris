@@ -65,6 +65,7 @@ sender:
   workers_per_mode:
     email: 500
     #hipchat: 10
+    #pushover: 2
 
   ## Default sender to reach out to if we can't determine one programmatically
   master_sender:
@@ -142,6 +143,18 @@ vendors: []
 #  auth_token: ''
 #  twilio_number: ''
 #  relay_base_url: ''
+
+#- type: iris_pushover
+#  name: pushover
+#  token: ''
+#  base_url: 'https://api.pushover.net/1/'
+#  iris_incident_url: 'http://localhost:16649/incidents'
+#  proxy: *proxy_shared
+#  title: 'Iris incident #{message[incident_id]}'
+#  url_title: 'Open in Iris'
+#  emergency:
+#    retry: 120
+#    expire: 600
 
 ## Hipchat support requires adding a new mode called "hipchat", in iris' mode table
 ## Also, uncomment the hipchat workers to the sender['workers_per_mode'] hash above
