@@ -14,3 +14,5 @@ venv
 /src/iris/ui/static/bundles
 .tox
 *.orig
+.idea/
+*.iml
