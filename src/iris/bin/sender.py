@@ -1558,7 +1558,7 @@ def main():
     gwatch_renewer_task = None
     prune_audit_logs_task = None
 
-    interval = 60
+    interval = config['sender'].get('interval_seconds', 60)
     logger.info('[*] sender bootstrapped')
     while True:
 

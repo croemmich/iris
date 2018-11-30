@@ -60,6 +60,7 @@ sender:
   process_title: iris-sender
   host: 127.0.0.1
   port: 2321
+  interval_seconds: 60
 
   ## Number of gevent workers per mode we send
   workers_per_mode:
