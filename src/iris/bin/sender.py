@@ -298,6 +298,7 @@ def create_messages(incident_id, plan_notification_id):
         names = cache.targets_for_role(role, target)
     except IrisRoleLookupException as e:
         names = None
+        metrics.incr('role_target_lookup_error')
         lookup_fail_reason = str(e)
     else:
         lookup_fail_reason = None
@@ -313,7 +314,6 @@ def create_messages(incident_id, plan_notification_id):
             return True
 
         # Try to get creator of the plan and nag them instead
-        metrics.incr('role_target_lookup_error')
         name = None
         try:
             name = cache.plans[plan_notification['plan_id']]['creator']

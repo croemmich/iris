@@ -18,7 +18,7 @@ First thing's first: clone the Iris repo:
 
 .. code:: sh
 
-    git clone git@github.com:linkedin/iris.git
+    git clone https://github.com/linkedin/iris.git
 
 Let's take a quick look through the source code.
  - ``ops`` - examples of deployment options with Docker, Kubernetes, etc
@@ -38,7 +38,7 @@ environment.
     virtualenv venv
     source venv/bin/activate
     sudo apt-get install libssl-dev libxml2-dev libxslt1-dev libsasl2-dev python-dev libldap2-dev
-    pip install -e '.[dev,kazoo]
+    pip install -e '.[dev,kazoo]'
 
 Configuring the database
 ------------------------
@@ -50,9 +50,9 @@ turn off the ``ONLY_FULL_GROUP_BY`` MySQL mode.
 
 .. code:: sql
 
-    CREATE USER ‘iris’@’localhost’ IDENTIFIED BY ‘iris’
-    CREATE DATABASE iris
-    GRANT ALL ON iris.* TO iris@localhost
+    CREATE USER 'iris'@'localhost' IDENTIFIED BY 'iris';
+    CREATE DATABASE iris;
+    GRANT ALL ON iris.* TO iris@localhost;
     SET GLOBAL sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));
 
 Now let’s load the schema and some dummy data. Navigate to project root,

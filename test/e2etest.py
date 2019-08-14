@@ -2007,7 +2007,7 @@ def test_post_plan_noc(sample_user, sample_team, sample_application_name):
 
 
 def test_get_applications(sample_application_name):
-    app_keys = set(['variables', 'required_variables', 'name', 'context_template', 'summary_template', 'sample_context', 'default_modes', 'supported_modes', 'owners', 'mobile_template'])
+    app_keys = set(['variables', 'required_variables', 'name', 'context_template', 'summary_template', 'sample_context', 'default_modes', 'supported_modes', 'owners', 'title_variable', 'mobile_template'])
     # TODO: insert application data before get
     re = requests.get(base_url + 'applications/' + sample_application_name)
     assert re.status_code == 200
@@ -3157,6 +3157,72 @@ def test_user_update_timezone(sample_user):
     re = session.get(base_url + 'users/settings/' + sample_user)
     assert re.status_code == 200
     assert re.json()['timezone'] == timezones[1]
+
+
+def test_comment(sample_user, sample_team, sample_application_name, sample_template_name):
+    data = {
+        "creator": sample_user,
+        "name": sample_user + "-test-comment-post",
+        "description": "Test plan for e2e test",
+        "threshold_window": 900,
+        "threshold_count": 10,
+        "aggregation_window": 300,
+        "aggregation_reset": 300,
+        "steps": [
+            [
+                {
+                    "role": "team",
+                    "target": sample_team,
+                    "priority": "low",
+                    "wait": 600,
+                    "repeat": 0,
+                    "template": sample_template_name,
+                    "optional": 0
+                },
+                {
+                    "role": "oncall-primary",
+                    "target": sample_team,
+                    "priority": "high",
+                    "wait": 300,
+                    "repeat": 1,
+                    "template": sample_template_name,
+                    "optional": 0
+                },
+            ],
+        ],
+        "isValid": True
+    }
+    re = requests.post(base_url + 'plans', json=data, headers=username_header(sample_user))
+    assert re.status_code == 201
+
+    re = requests.post(base_url + 'incidents', json={
+        'plan': sample_user + '-test-comment-post',
+        'context': {},
+    }, headers={'Authorization': 'hmac %s:abc' % sample_application_name})
+    incident_id = int(re.content)
+    assert re.status_code == 201
+    re = requests.get(base_url + 'incidents/%s' % re.content.strip())
+    assert re.status_code == 200
+
+    # Post a few comments for the incident
+    re = requests.post(base_url + 'incidents/%s/comments' % incident_id, headers=username_header(sample_user), json={
+        'author': sample_user,
+        'content': 'Hello world'
+    })
+    assert re.status_code == 201
+    re = requests.post(base_url + 'incidents/%s/comments' % incident_id, headers=username_header(sample_user), json={
+        'author': sample_user,
+        'content': 'Goodbye world'
+    })
+    assert re.status_code == 201
+    # Get incident info and verify comments
+    re = requests.get(base_url + 'incidents/%s' % incident_id)
+    assert re.status_code == 200
+    comments = re.json()['comments']
+    assert comments[0]['content'] == 'Hello world'
+    assert comments[0]['author'] == sample_user
+    assert comments[1]['content'] == 'Goodbye world'
+    assert comments[1]['author'] == sample_user
 
 
 @pytest.mark.skip(reason="Re-enable this when we don't hard-code primary keys")

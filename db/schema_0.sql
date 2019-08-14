@@ -543,6 +543,7 @@ CREATE TABLE `template_variable` (
   `application_id` int(11) NOT NULL,
   `name` varchar(255) NOT NULL,
   `required` tinyint(1) NOT NULL DEFAULT '0',
+  `title_variable` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   KEY `ix_template_variable_application_id` (`application_id`),
   CONSTRAINT `template_variable_ibfk_1` FOREIGN KEY (`application_id`) REFERENCES `application` (`id`)
@@ -758,6 +759,17 @@ CREATE TABLE `global_stats` (
   PRIMARY KEY (`statistic`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
+DROP TABLE IF EXISTS `comment`;
+CREATE TABLE `comment` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT,
+  `incident_id` BIGINT(20) NOT NULL,
+  `created` DATETIME NOT NULL,
+  `user_id` BIGINT(20) NOT NULL,
+  `content` TEXT NOT NULL,
+  PRIMARY KEY (`id`),
+  CONSTRAINT `comment_incident_id_ibfk` FOREIGN KEY (`incident_id`) REFERENCES `incident` (`id`),
+  CONSTRAINT `comment_user_id_ibfk` FOREIGN KEY (`user_id`) REFERENCES `user` (`target_id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

@@ -12,6 +12,7 @@ import requests
 import importlib
 import logging
 import re
+import pyqrcode
 from iris.ui import auth
 from beaker.middleware import SessionMiddleware
 
@@ -26,6 +27,7 @@ assets_env = AssetsEnvironment(os.path.join(ui_root, 'static'), url='/static')
 
 assets_env.register('jquery_libs', Bundle('js/jquery-3.3.1.min.js', 'js/jquery.dataTables.min.js',
                                           'js/handlebars-4.0.12.min.js', 'js/hopscotch.min.js',
+                                          'js/marked.min.js',
                                           output='bundles/jquery.libs.js'))
 assets_env.register('bootstrap_libs', Bundle('js/bootstrap.min.js', 'js/typeahead.js',
                                              'js/bootstrap-datetimepicker.js', 'js/moment-timezone.js',
@@ -100,6 +102,14 @@ def get_flash(req):
 # that makes use of window.appData is converted to use ajax for those values instead.
 def get_local_api(req, path):
     return requests.get('%s/v0/%s' % (local_api_url, path), cookies=req.cookies).json()
+
+
+def create_qr_code(qr_base_url, qr_login_url):
+    qr_code_content = qr_base_url + ',' + qr_login_url
+    qr_object = pyqrcode.create(qr_code_content)
+    # create qr code and save it as a svg image
+    qr_filename = ui_root + '/static/images/iris-mobile-qr.svg'
+    qr_object.svg(qr_filename, scale=8)
 
 
 # Credit to Werkzeug for implementation
@@ -320,6 +330,19 @@ class User():
                                                                 applications=get_local_api(req, 'applications'))
 
 
+class Qr(object):
+    allow_read_no_auth = True
+    frontend_route = True
+
+    def __init__(self, qr_base_url, qr_login_url):
+        self.qr_base_url = qr_base_url
+        self.qr_login_url = qr_login_url
+
+    def on_get(self, req, resp):
+        resp.content_type = 'text/html'
+        resp.body = jinja2_env.get_template('qr.html').render(base=self.qr_base_url, login=self.qr_login_url)
+
+
 class JinjaValidate():
     allow_read_no_auth = False
     frontend_route = True
@@ -398,6 +421,8 @@ def init(config, app):
     auth_module = config.get('auth', {'module': 'iris.ui.auth.noauth'})['module']
     auth = importlib.import_module(auth_module)
     auth_manager = getattr(auth, 'Authenticator')(config)
+    qr_base_url = config.get('qr_base_url')
+    qr_login_url = config.get('qr_login_url')
 
     debug = config['server'].get('disable_auth', False) is True
     local_api_url = config['server'].get('local_api_url', 'http://localhost:16649')
@@ -421,6 +446,10 @@ def init(config, app):
     app.add_route('/logout/', Logout())
     app.add_route('/user/', User())
     app.add_route('/validate/jinja', JinjaValidate())
+
+    if(qr_base_url and qr_login_url):
+        create_qr_code(qr_base_url, qr_login_url)
+        app.add_route('/qr', Qr(qr_base_url, qr_login_url))
 
     # Configuring the beaker middleware mutilates the app object, so do it
     # at the end, after we've added all routes/sinks for the entire iris

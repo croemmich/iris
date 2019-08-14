@@ -29,7 +29,7 @@ setuptools.setup(
         'requests==2.20.0',
         'PyMySQL==0.7.2',
         'SQLAlchemy==1.0.11',
-        'Jinja2==2.8',
+        'Jinja2==2.10',
         'importlib==1.0.3',
         'Markdown==2.4.1',
         'click==6.6',
@@ -38,11 +38,13 @@ setuptools.setup(
         'beaker==1.10.0',
         'cryptography==2.3',
         'webassets==0.12.1',
-        'python-ldap==2.4.9',
+        'python-ldap==3.1.0',
         'exchangelib==1.10.0',
         'setproctitle==1.1.8',
         'pyfcm==1.4.3',
-        'oncallclient==1.0.0'
+        'oncallclient==1.0.0',
+        'idna==2.7',
+        'pyqrcode==1.2.1'
     ],
     extras_require={
         'kazoo': ['kazoo==2.3.1'],
@@ -56,7 +58,7 @@ setuptools.setup(
             'sphinx_rtd_theme',
             # test deps
             'mock==2.0.0',
-            'pytest==3.0.5',
+            'pytest==4.1.0',
             'pytest-mock==1.5.0',
             'pytest-cov',
             'flake8==3.5.0',

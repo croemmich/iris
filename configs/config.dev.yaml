@@ -46,6 +46,11 @@ healthcheck_path: /tmp/status
 allowed_origins:
   - http://localhost:8080
 
+## values for base url and login url to be consumed by the mobile app
+## set to Null to disable the qr endpoint
+qr_base_url: Null
+qr_login_url: Null
+
 ## Custom webhooks can be created and put in src/iris/webhooks.
 ## Refer to their class name in this array.
 ## The webhook will be available at /v0/webhooks/$name and requires being called with
@@ -123,6 +128,10 @@ vendors: []
 #  smtp_server: 'smtp1.example.com'
 #  smtp_gateway: 'smtp2.example.com'
 #  from: 'foouser@example.com'
+#  port: 25
+#  username: 'foobar'
+#  password: 'secretpass'
+
 ## If True, make a pool of persistent connections per each MX record for the given smtp_gateway
 ##  autoscale: False
 ##  tasks_per_mx: 4

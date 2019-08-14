@@ -6,6 +6,7 @@ from iris.constants import EMAIL_SUPPORT, IM_SUPPORT
 from smtplib import SMTP
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formatdate
 import quopri
 import time
 import markdown
@@ -76,6 +77,7 @@ class iris_smtp(object):
         if incident_id:
             m['X-IRIS-INCIDENT-ID'] = str(incident_id)
 
+        m['Date'] = formatdate(localtime=True)
         m['from'] = from_address
         m['to'] = message['destination']
         if message.get('noreply'):
@@ -129,7 +131,9 @@ class iris_smtp(object):
             for mx in self.mx_sorted:
                 try:
                     smtp = SMTP(timeout=self.smtp_timeout)
-                    smtp.connect(mx[1], 25)
+                    smtp.connect(mx[1], self.config.get('port', 25))
+                    if self.config.get('username', None) is not None and self.config.get('password', None) is not None:
+                        smtp.login(self.config.get('username', None), self.config.get('password', None))
                     conn = smtp
                     self.last_conn = conn
                     self.last_conn_server = mx[1]

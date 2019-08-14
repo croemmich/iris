@@ -162,6 +162,7 @@ incident_columns = {
     'created': 'UNIX_TIMESTAMP(`incident`.`created`) as `created`',
     'owner': '`target`.`name` as `owner`',
     'current_step': '`incident`.`current_step` as `current_step`',
+    'title_variable_name': '`template_variable`.`name` as `title_variable_name`'
 }
 
 incident_filters = {
@@ -188,7 +189,8 @@ incident_filter_types = {
 incident_query = '''SELECT DISTINCT %s FROM `incident`
 JOIN `plan` ON `incident`.`plan_id` = `plan`.`id`
 LEFT OUTER JOIN `target` ON `incident`.`owner_id` = `target`.`id`
-JOIN `application` ON `incident`.`application_id` = `application`.`id`'''
+JOIN `application` ON `incident`.`application_id` = `application`.`id`
+LEFT OUTER JOIN `template_variable` ON (`template_variable`.`application_id` = `application`.`id` AND `template_variable`.`title_variable` = 1)'''
 
 single_incident_query = '''SELECT `incident`.`id` as `id`,
     `incident`.`plan_id` as `plan_id`,
@@ -204,6 +206,7 @@ FROM `incident`
 JOIN `plan` ON `incident`.`plan_id` = `plan`.`id`
 LEFT OUTER JOIN `target` ON `incident`.`owner_id` = `target`.`id`
 JOIN `application` ON `incident`.`application_id` = `application`.`id`
+LEFT OUTER JOIN `template_variable` ON (`template_variable`.`application_id` = `application`.`id` AND `template_variable`.`title_variable` = 1)
 WHERE `incident`.`id` = %s'''
 
 single_incident_query_steps = '''SELECT `message`.`id` as `id`,
@@ -222,6 +225,12 @@ JOIN `target` ON `message`.`target_id` = `target`.`id`
 JOIN `plan_notification` ON `message`.`plan_notification_id` = `plan_notification`.`id`
 WHERE `message`.`incident_id` = %s
 ORDER BY `message`.`sent`'''
+
+single_incident_query_comments = '''
+SELECT `target`.`name` AS `author`, `comment`.`created`, `comment`.`content`
+FROM `comment` JOIN `target` ON `user_id` = `target`.`id`
+WHERE `comment`.`incident_id` = %s
+'''
 
 plan_columns = {
     'id': '`plan`.`id` as `id`',
@@ -524,7 +533,7 @@ get_applications_query = '''SELECT
 FROM `application`
 WHERE `auth_only` is False'''
 
-get_vars_query = 'SELECT `name`, `required` FROM `template_variable` WHERE `application_id` = %s ORDER BY `required` DESC, `name` ASC'
+get_vars_query = 'SELECT `name`, `required`, `title_variable` FROM `template_variable` WHERE `application_id` = %s ORDER BY `required` DESC, `name` ASC'
 
 get_allowed_roles_query = '''SELECT `target_role`.`id`
                              FROM `target_role`
@@ -568,9 +577,15 @@ get_application_owners_query = '''SELECT `target`.`name`
 uuid4hex = re.compile('[0-9a-f]{32}\Z', re.I)
 
 
-def stream_incidents_with_context(cursor):
+def stream_incidents_with_context(cursor, title=False):
     for row in cursor:
         row['context'] = ujson.loads(row['context'])
+        if title:
+            title_variable_name = row.get('title_variable_name')
+            if title_variable_name:
+                row['title'] = row['context'][title_variable_name]
+            else:
+                row['title'] = None
         yield row
 
 
@@ -1423,7 +1438,10 @@ class Incidents(object):
         cursor.execute(query, sql_values)
 
         if 'context' in fields:
-            payload = ujson.dumps(stream_incidents_with_context(cursor))
+            if 'title_variable_name' in fields:
+                payload = ujson.dumps(stream_incidents_with_context(cursor, True))
+            else:
+                payload = ujson.dumps(stream_incidents_with_context(cursor, False))
         else:
             payload = ujson.dumps(cursor)
         connection.close()
@@ -1642,6 +1660,9 @@ class Incident(object):
         if incident:
             cursor.execute(single_incident_query_steps, (auditlog.MODE_CHANGE, auditlog.TARGET_CHANGE, incident['id']))
             incident['steps'] = cursor.fetchall()
+
+            cursor.execute(single_incident_query_comments, incident['id'])
+            incident['comments'] = cursor.fetchall()
             connection.close()
 
             incident['context'] = ujson.loads(incident['context'])
@@ -2438,10 +2459,13 @@ class Application(object):
         cursor.execute(get_vars_query, app['id'])
         app['variables'] = []
         app['required_variables'] = []
+        app['title_variable'] = None
         for row in cursor:
             app['variables'].append(row['name'])
             if row['required']:
                 app['required_variables'].append(row['name'])
+            if row['title_variable']:
+                app['title_variable'] = row['name']
 
         cursor.execute(get_default_application_modes_query, app_name)
         app['default_modes'] = {row['priority']: row['mode'] for row in cursor}
@@ -2505,17 +2529,37 @@ class Application(object):
                     {'application_id': app['id']})
             }
 
+            title_variable = data.get('title_variable')
+            # if no variables are set then title variable will be null
+            if not new_variables:
+                title_variable = None
+            elif title_variable and title_variable not in new_variables:
+                raise HTTPBadRequest('title variable is invalid')
+
             kill_variables = existing_variables - new_variables
 
+            # insert new variables and update the value of title_variable for existing variables
             for variable in new_variables - existing_variables:
                 session.execute('''INSERT INTO `template_variable` (`application_id`, `name`)
-                                VALUES (:application_id, :variable)''',
+                                    VALUES (:application_id, :variable)''',
                                 {'application_id': app['id'], 'variable': variable})
 
             if kill_variables:
                 session.execute('''DELETE FROM `template_variable`
                                 WHERE `application_id` = :application_id AND `name` IN :variables''',
                                 {'application_id': app['id'], 'variables': tuple(kill_variables)})
+
+            # update value of title variable for application
+            if title_variable:
+                session.execute('''UPDATE `template_variable`
+                                SET `title_variable` = IF(`name` = :title_val, 1, 0)
+                                WHERE `application_id`= :application_id''',
+                                {'application_id': app['id'], 'title_val': title_variable})
+            else:
+                session.execute('''UPDATE `template_variable`
+                                SET `title_variable` = 0
+                                WHERE `application_id`= :application_id''',
+                                {'application_id': app['id']})
 
             # Only owners can (optionally) change owners
             new_owners = data.get('owners')
@@ -3219,7 +3263,7 @@ class ApplicationPlans(object):
             connection, plan_filters, plan_filter_types, req.params)
 
         query = '''SELECT %s
-                   FROM `plan_active` JOIN `plan` ON `plan_active`.`plan_id` = `plan`.`id`
+                   FROM `plan_active` LEFT JOIN `plan` ON `plan_active`.`plan_id` = `plan`.`id`
                    JOIN `plan_notification` ON `plan`.`id` = `plan_notification`.`plan_id`
                    JOIN `template` ON `plan_notification`.`template` = `template`.`name`
                    JOIN `template_active` ON `template`.`id` = `template_active`.`template_id`
@@ -3245,6 +3289,7 @@ class Applications(object):
         cursor.execute(get_applications_query + ' ORDER BY `application`.`name` ASC')
         apps = cursor.fetchall()
         for app in apps:
+            app['title_variable'] = None
             cursor.execute(get_vars_query, app['id'])
             app['variables'] = []
             app['required_variables'] = []
@@ -3252,6 +3297,8 @@ class Applications(object):
                 app['variables'].append(row['name'])
                 if row['required']:
                     app['required_variables'].append(row['name'])
+                if row['title_variable'] == 1:
+                    app['title_variable'] = row['name']
 
             cursor.execute(get_default_application_modes_query, app['name'])
             app['default_modes'] = {row['priority']: row['mode'] for row in cursor}
@@ -4241,6 +4288,53 @@ class Devices(object):
         resp.status = HTTP_201
 
 
+class Comments(object):
+    allow_read_no_auth = True
+
+    def on_post(self, req, resp, incident_id):
+        comment = ujson.loads(req.context['body'])
+        if not comment['content']:
+            raise HTTPBadRequest('Empty comment')
+        if not acl_allowed(req, comment['author']):
+            raise HTTPForbidden('Comment author must match logged in user')
+        comment['incident_id'] = incident_id
+        comment['created'] = datetime.datetime.utcnow()
+
+        conn = db.engine.raw_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                '''
+                INSERT INTO `comment` (`incident_id`, `user_id`, `created`, `content`)
+                VALUES
+                (%(incident_id)s,
+                (SELECT `id` FROM `user` JOIN `target` ON `user`.`target_id` = `target`.`id` WHERE `name` = %(author)s),
+                %(created)s,
+                %(content)s)
+                ''',
+                comment)
+        except Exception:
+            raise HTTPBadRequest('Failed to post comment')
+        else:
+            conn.commit()
+        finally:
+            cursor.close()
+            conn.close()
+
+        resp.status = HTTP_201
+        resp.body = str(cursor.lastrowid)
+
+    def on_get(self, req, resp, incident_id):
+        conn = db.engine.raw_connection()
+        cursor = conn.cursor(db.dict_cursor)
+        cursor.execute(
+            single_incident_query_comments,
+            incident_id)
+        resp.body = ujson.dumps(cursor)
+        cursor.close()
+        conn.close()
+
+
 def update_cache_worker():
     while True:
         logger.debug('Reinitializing cache')
@@ -4272,6 +4366,7 @@ def construct_falcon_api(debug, healthcheck_path, allowed_origins, iris_sender_a
     api.add_route('/v0/incidents/{incident_id}', Incident())
     api.add_route('/v0/incidents', Incidents())
     api.add_route('/v0/incidents/claim', ClaimIncidents())
+    api.add_route('/v0/incidents/{incident_id}/comments', Comments())
 
     api.add_route('/v0/messages/{message_id}', Message())
     api.add_route('/v0/messages/{message_id}/auditlog', MessageAuditLog())

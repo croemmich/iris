@@ -415,6 +415,7 @@ table.dataTable thead .sorting_asc {
 .plan-step {
   padding: 10px 20px;
   position: relative;
+  list-style-type: none;
 }
 
 .plan-step {
@@ -841,9 +842,8 @@ table.dataTable thead .sorting_asc {
 }
 
 #tracking-notification .template-notification {
-  width: 516px;
-  height: 228px;
-  min-height: 200px;
+  min-width: 516px;
+  min-height: 228px;
 }
 
 #tracking-notification .template-notification .notification-body {
@@ -1304,6 +1304,46 @@ table.dataTable thead .sorting_asc {
 
 .incident-details #context-table td {
   padding: 5px;
+}
+
+#comment-body {
+  height: 100px;
+}
+
+.comment-display {
+  padding-left: 10px;
+}
+
+.comment-header {
+  margin-bottom: 3px;
+  font-size: 12px;
+  color: #777;
+}
+
+.comment-content{
+  padding-left: 10px;
+}
+
+.comment-actions {
+  margin-top: 10px;
+}
+
+#add-comment {
+  display: none;
+}
+
+#re-escalate-container label {
+  vertical-align: bottom;
+}
+
+.re-escalate-plan-container {
+  max-height: 600px;
+  overflow-y: scroll;
+  overflow-x: hidden;
+}
+
+#re-escalate-container {
+  margin-bottom: 10px;
 }
 
 #summary-info-modal .modal-content {
